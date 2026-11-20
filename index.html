@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Boble-Blokk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: arkade-moro, fredagsenergi
+   IDEA: et gammelt arkadeskap – Tetris-brett fylt med bobler og små sinte monstre
+   PICTURE: selve spillebrettet, stort, fyller skjermen
+   COLOUR and TYPE: dyp nattlilla, fire boblefarger, Bungee + Nunito
+   LAYOUT: tall-rad øverst, brett i midten, store knapper nederst (mobil først) */
+:root{color-scheme:dark;--bg:#160b2e;--bg2:#24124a;--ink:#f6f0ff;--dim:#b9a8e0;--acc:#ffd23f;--pink:#ff4d6d}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(120% 80% at 50% 0%,#3a1d74 0%,var(--bg) 60%);color:var(--ink);font:16px/1.4 Nunito,system-ui,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.app{height:100dvh;max-width:560px;margin:0 auto;display:flex;flex-direction:column;padding:max(8px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom))}
+header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 2px 8px}
+h1{font:400 clamp(20px,6vw,28px)/1 Bungee,sans-serif;margin:0;color:var(--acc);text-shadow:0 3px 0 #b5179e}
+.stats{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:13px;color:var(--dim)}
+.stats b{color:var(--ink);font-size:16px;font-weight:800;margin-left:4px;font-variant-numeric:tabular-nums}
+.nextbox{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+#next{width:64px;height:48px;background:#0e0620;border-radius:10px;border:2px solid #4b2a8c}
+.iconbtn{width:44px;height:44px;border-radius:12px;border:2px solid #4b2a8c;background:var(--bg2);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.well{flex:1;display:grid;place-items:center;position:relative;min-height:0}
+#board{display:block;background:#0e0620;border-radius:14px;box-shadow:0 0 0 3px #4b2a8c,0 0 0 7px #24124a,0 18px 40px #0008}
+.controls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding-top:10px}
+.controls button{height:64px;border-radius:16px;border:0;background:linear-gradient(#3d2178,#2a1557);color:var(--ink);display:grid;place-items:center;box-shadow:0 4px 0 #12082a;cursor:pointer;touch-action:none}
+.controls button:active,.controls button.on{transform:translateY(3px);box-shadow:0 1px 0 #12082a;background:linear-gradient(#5a31ad,#3d2178)}
+.controls button.drop{background:linear-gradient(#ff6b8a,#d6335a);box-shadow:0 4px 0 #7a1030}
+.controls svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#0e0620d9;border-radius:14px;text-align:center;padding:20px}
+.overlay[hidden]{display:none}
+.card{max-width:340px}
+.card h2{font:400 clamp(28px,9vw,42px)/1.05 Bungee,sans-serif;margin:0 0 10px;color:var(--acc);text-shadow:0 4px 0 #b5179e}
+.card p{margin:0 0 10px;color:var(--dim);font-size:15px}
+.card ul{list-style:none;padding:0;margin:0 0 16px;text-align:left;font-size:15px}
+.card li{display:flex;gap:10px;align-items:center;padding:5px 0}
+.dot{flex:none;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff9 0 18%,transparent 20%),var(--c)}
+.big{font:400 20px Bungee,sans-serif;padding:14px 30px;border:0;border-radius:16px;background:var(--acc);color:#2a1557;box-shadow:0 5px 0 #b38a00;cursor:pointer;min-height:44px}
+.big:active{transform:translateY(3px);box-shadow:0 2px 0 #b38a00}
+.card .credit{margin:18px 0 0;font:400 12px Bungee,sans-serif;color:#8f7bc4;letter-spacing:.02em}
+.score{font:400 34px Bungee,sans-serif;color:var(--ink);margin:4px 0 6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Boble-Blokk</h1>
+      <div class="stats">
+        <span>Poeng<b id="sScore">0</b></span>
+        <span>Nivå<b id="sLevel">1</b></span>
+        <span>Linjer<b id="sLines">0</b></span>
+        <span>Rekord<b id="sBest">0</b></span>
+      </div>
+    </div>
+    <div class="nextbox">
+      <span>Neste</span><canvas id="next" width="128" height="96"></canvas>
+      <button class="iconbtn" id="musicBtn" aria-label="Musikk av/på"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 17V5l11-2v12" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="6.5" cy="17.5" r="3"/><circle cx="17.5" cy="15" r="3"/><path id="musicX" d="M3 3l18 18" stroke="#ff4d6d" stroke-width="2.6" style="display:none"/></svg></button>
+      <button class="iconbtn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+    </div>
+  </header>
+
+  <div class="well" id="well">
+    <canvas id="board"></canvas>
+    <div class="overlay" id="ov">
+      <div class="card" id="ovCard">
+        <h2>Boble-Blokk</h2>
+        <p>Tetris møter boble-monstre!</p>
+        <ul>
+          <li><span class="dot" style="--c:#ff4d6d"></span>Fyll en hel rad – den forsvinner</li>
+          <li><span class="dot" style="--c:#3ddc97"></span>4 like bobler som henger sammen – POPP!</li>
+          <li><span class="dot" style="--c:#4ea8ff"></span>Popp bobler med monster i = frukt og 500 poeng</li>
+          <li><span class="dot" style="--c:#ffd23f"></span>Kjedereaksjoner gir dobbel, trippel …</li>
+        </ul>
+        <p>Trykk på brettet = snu · sveip = flytt · sveip ned = slipp</p>
+        <button class="big" id="startBtn">Start</button>
+        <p class="credit">Wåle production 2026</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button data-a="left" aria-label="Venstre"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button data-a="rot" aria-label="Snu"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 4v4h-4"/></svg></button>
+    <button data-a="down" aria-label="Ned"><svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></svg></button>
+    <button data-a="right" aria-label="Høyre"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button data-a="drop" class="drop" aria-label="Slipp"><svg viewBox="0 0 24 24"><path d="M6 6l6 6 6-6"/><path d="M6 12l6 6 6-6"/></svg></button>
+  </div>
+</div>
+
+<script>
+{
+const COLS=10,ROWS=20;
+const COLORS=['#ff4d6d','#ffd23f','#3ddc97','#4ea8ff'];
+const DARK=['#a3123a','#b58a00','#16935e','#1a5fb4'];
+const SHAPES={I:[[0,0],[1,0],[2,0],[3,0]],O:[[0,0],[1,0],[0,1],[1,1]],T:[[0,0],[1,0],[2,0],[1,1]],S:[[1,0],[2,0],[0,1],[1,1]],Z:[[0,0],[1,0],[1,1],[2,1]],L:[[0,0],[1,0],[2,0],[0,1]],J:[[0,0],[1,0],[2,0],[2,1]]};
+const $=id=>document.getElementById(id);
+const board=$('board'),bx=board.getContext('2d'),nextC=$('next'),nx=nextC.getContext('2d'),well=$('well');
+const ov=$('ov'),ovCard=$('ovCard');
+
+let grid,cur,nxt,bag=[],state='start',score=0,lines=0,pops=0,level=1,chain=0;
+let dropT=0,popT=0,popping=new Set(),parts=[],floats=[],cell=24,dpr=1,last=0,shake=0;
+let best=0;try{best=+localStorage.getItem('bobleblokk-best')||0}catch(e){}
+
+/* ---------- lyd ---------- */
+let ac=null;
+function beep(f,d=.08,type='sine',v=.12){
+  if(!ac)return;try{const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(f*1.6,ac.currentTime+d);g.gain.setValueAtTime(v,ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}
+}
+function coin(){if(!ac)return;beep(988,.07,'square',.05);setTimeout(()=>beep(1319,.16,'square',.05),70)}
+function initAudio(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}else if(ac.state==='suspended')ac.resume()}
+
+/* ---------- musikk (egen, hoppete arkademelodi) ---------- */
+const _=null;
+const MEL=[
+ 72,76,79,76, 77,76,74,_, 72,74,76,79, 81,79,76,_, 74,77,81,77, 79,77,76,74, 72,74,76,72, 74,_,67,_,
+ 72,76,79,76, 77,76,74,_, 72,74,76,79, 81,79,84,_, 83,81,79,77, 76,74,72,74, 76,74,71,74, 72,_,_,_,
+ 76,79,84,79, 81,79,77,76, 74,77,81,77, 79,_,74,_, 72,76,79,76, 77,76,74,72, 71,74,79,77, 76,_,74,_,
+ 76,79,84,79, 81,79,77,76, 74,77,81,84, 83,_,79,_, 81,79,77,76, 74,76,77,79, 72,_,_,_];
+const BASS=[48,53,50,55, 48,53,55,48, 52,53,55,48, 52,53,55,48];
+let musicOn=true;try{musicOn=localStorage.getItem('bobleblokk-music')!=='0'}catch(e){}
+let mGain=null,mTimer=null,mStep=0,mNext=0,noiseBuf=null;
+const hz=n=>440*Math.pow(2,(n-69)/12);
+function note(f,t,d,type,v){const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(mGain);o.start(t);o.stop(t+d+.02)}
+function hat(t,v){const s=ac.createBufferSource(),g=ac.createGain(),f=ac.createBiquadFilter();s.buffer=noiseBuf;f.type='highpass';f.frequency.value=7000;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);s.connect(f).connect(g).connect(mGain);s.start(t);s.stop(t+.06)}
+function kick(t){const o=ac.createOscillator(),g=ac.createGain();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(40,t+.12);
+  g.gain.setValueAtTime(.5,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.connect(g).connect(mGain);o.start(t);o.stop(t+.16)}
+function tick(){
+  const sd=60/(138+(level-1)*6)/2;
+  while(mNext<ac.currentTime+.12){
+    const i=mStep%MEL.length,t=mNext,m=MEL[i];
+    if(m!==_){note(hz(m),t,sd*.9,'square',.09);note(hz(m+12),t,sd*.5,'triangle',.03)}
+    const b=BASS[Math.floor(i/8)%BASS.length],k=i%8;
+    if(k%2===0)note(hz(k%4===0?b:b+12),t,sd*.8,'triangle',.22);
+    if(k===0||k===4)kick(t);
+    if(k%2===1)hat(t,.08);
+    mStep++;mNext+=sd;
+  }
+}
+function musicStart(){
+  if(!ac||!musicOn||mTimer)return;
+  if(!mGain){mGain=ac.createGain();mGain.gain.value=.16;mGain.connect(ac.destination);
+    noiseBuf=ac.createBuffer(1,ac.sampleRate*.1,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+  mNext=ac.currentTime+.05;tick();mTimer=setInterval(tick,25);
+}
+function musicStop(){clearInterval(mTimer);mTimer=null}
+function musicIcon(){document.getElementById('musicX').style.display=musicOn?'none':''}
+
+/* ---------- brikker ---------- */
+function newPiece(){
+  if(!bag.length){bag=Object.keys(SHAPES);for(let i=bag.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[bag[i],bag[j]]=[bag[j],bag[i]]}}
+  const k=bag.pop(),s=SHAPES[k],p=s[1];
+  const c1=Math.random()*4|0,c2=Math.random()*4|0;
+  const cells=s.map(([x,y])=>({x:x-p[0],y:y-p[1],c:Math.random()<.5?c1:c2,m:false}));
+  if(Math.random()<.22)cells[Math.random()*4|0].m=true;
+  return{k,cells,x:4,y:0};
+}
+function place(p){p.x=4;p.y=-Math.min(...p.cells.map(c=>c.y))}
+function hits(p,dx=0,dy=0,cells=p.cells){
+  return cells.some(c=>{const x=p.x+c.x+dx,y=p.y+c.y+dy;return x<0||x>=COLS||y>=ROWS||(y>=0&&grid[y][x])});
+}
+function move(dx){if(state==='play'&&!hits(cur,dx,0)){cur.x+=dx;beep(300,.03,'square',.03);return true}return false}
+function rotate(){
+  if(state!=='play'||cur.k==='O')return;
+  const r=cur.cells.map(c=>({...c,x:-c.y,y:c.x}));
+  for(const k of [0,-1,1,-2,2]){if(!hits(cur,k,0,r)){cur.cells=r;cur.x+=k;beep(520,.05,'triangle',.05);return}}
+}
+function soft(){if(state!=='play')return;if(!hits(cur,0,1)){cur.y++;score+=1;dropT=0}else lock()}
+function hard(){if(state!=='play')return;let n=0;while(!hits(cur,0,1)){cur.y++;n++}score+=n*2;shake=6;lock()}
+
+function lock(){
+  for(const c of cur.cells){const y=cur.y+c.y;if(y<0){gameOver();return}grid[y][cur.x+c.x]={c:c.c,m:c.m}}
+  beep(160,.08,'square',.06);chain=0;cur=null;resolve();
+}
+function spawn(){cur=nxt;nxt=newPiece();place(cur);dropT=0;if(hits(cur))gameOver();else state='play';drawNext()}
+
+/* ---------- finn rader og boblegrupper ---------- */
+function find(){
+  const set=new Set();let rows=0,colorN=0;
+  for(let y=0;y<ROWS;y++)if(grid[y].every(v=>v)){rows++;for(let x=0;x<COLS;x++)set.add(x+','+y)}
+  const seen=new Set();
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const v=grid[y][x];if(!v||seen.has(x+','+y))continue;
+    const grp=[],st=[[x,y]];seen.add(x+','+y);
+    while(st.length){const[a,b]=st.pop();grp.push([a,b]);
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx_=a+dx,ny=b+dy,key=nx_+','+ny;
+        if(nx_>=0&&nx_<COLS&&ny>=0&&ny<ROWS&&!seen.has(key)&&grid[ny][nx_]&&grid[ny][nx_].c===v.c){seen.add(key);st.push([nx_,ny])}}}
+    if(grp.length>=4){colorN+=grp.length;grp.forEach(([a,b])=>set.add(a+','+b))}
+  }
+  return{set,rows,colorN};
+}
+function resolve(){
+  const r=find();
+  if(!r.set.size){spawn();return}
+  chain++;
+  let pts=[0,100,300,500,800][Math.min(r.rows,4)]*level+r.colorN*20*level;
+  let mons=0;
+  for(const k of r.set){const[x,y]=k.split(',').map(Number),v=grid[y][x];
+    for(let i=0;i<5;i++)parts.push({x:(x+.5),y:(y+.5),vx:(Math.random()-.5)*8,vy:(Math.random()-.8)*8,l:1,c:COLORS[v.c]});
+    if(v.m){mons++;floats.push({x:x+.5,y:y+.5,t:0,txt:'+500',fruit:true})}}
+  pts=pts*chain+mons*500;score+=pts;lines+=r.rows;pops+=r.colorN;
+  if(chain>1)floats.push({x:COLS/2,y:ROWS/2,t:0,txt:'KJEDE x'+chain+'!',big:true});
+  else if(r.rows>=4)floats.push({x:COLS/2,y:ROWS/2,t:0,txt:'BOBLE-TETRIS!',big:true});
+  level=1+Math.floor((lines+Math.floor(pops/6))/8);
+  popping=r.set;popT=0;state='pop';shake=Math.max(shake,3+chain);
+  coin();setTimeout(()=>beep(440+chain*120,.15,'sine',.08),40);if(mons)setTimeout(()=>beep(880,.2,'triangle',.1),90);
+}
+function finishPop(){
+  for(const k of popping){const[x,y]=k.split(',').map(Number);grid[y][x]=null}
+  popping=new Set();
+  for(let x=0;x<COLS;x++){let w=ROWS-1;for(let y=ROWS-1;y>=0;y--){if(grid[y][x]){const v=grid[y][x];grid[y][x]=null;grid[w--][x]=v}}}
+  resolve();
+}
+
+/* ---------- spilltilstand ---------- */
+function start(){
+  initAudio();
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  score=0;lines=0;pops=0;level=1;parts=[];floats=[];bag=[];
+  nxt=newPiece();spawn();ov.hidden=true;musicStop();mStep=0;musicStart();
+}
+function gameOver(){
+  state='over';cur=null;musicStop();beep(200,.4,'sawtooth',.1);
+  const nb=score>best;if(nb){best=score;try{localStorage.setItem('bobleblokk-best',best)}catch(e){}}
+  ovCard.innerHTML=`<h2>Game over</h2><p>${nb?'Ny rekord!':'Poeng'}</p><div class="score">${score.toLocaleString('nb-NO')}</div><p>Nivå ${level} · ${lines} linjer · ${pops} bobler poppet</p><button class="big" id="againBtn">Spill igjen</button>`;
+  ov.hidden=false;$('againBtn').onclick=start;
+}
+function togglePause(){
+  if(state==='play'||state==='pop'){musicStop();state='pause:'+state;ovCard.innerHTML=`<h2>Pause</h2><p>Ta en pust i bakken.</p><button class="big" id="resBtn">Fortsett</button>`;ov.hidden=false;$('resBtn').onclick=togglePause}
+  else if(state.startsWith('pause:')){state=state.slice(6);ov.hidden=true;last=performance.now();musicStart()}
+}
+
+/* ---------- tegning ---------- */
+function bubble(ctx,px,py,r,ci,m,alpha=1,s=1){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(px,py);ctx.scale(s,s);
+  const g=ctx.createRadialGradient(-r*.35,-r*.4,r*.1,0,0,r);
+  g.addColorStop(0,'#fff');g.addColorStop(.25,COLORS[ci]);g.addColorStop(1,DARK[ci]);
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();
+  ctx.lineWidth=Math.max(1,r*.08);ctx.strokeStyle='#ffffff55';ctx.stroke();
+  if(m){ // lite sint monster inni boblen
+    ctx.fillStyle='#2a1557';ctx.beginPath();ctx.arc(0,r*.18,r*.55,0,7);ctx.fill();
+    for(const sx of[-1,1]){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx*r*.22,r*.08,r*.16,0,7);ctx.fill();
+      ctx.fillStyle='#000';ctx.beginPath();ctx.arc(sx*r*.2,r*.12,r*.08,0,7);ctx.fill();
+      ctx.strokeStyle='#ff4d6d';ctx.lineWidth=r*.09;ctx.beginPath();ctx.moveTo(sx*r*.38,-r*.12);ctx.lineTo(sx*r*.08,-r*.02);ctx.stroke()}
+    ctx.fillStyle='#fff';for(const sx of[-1,1]){ctx.beginPath();ctx.moveTo(sx*r*.15,r*.42);ctx.lineTo(sx*r*.06,r*.56);ctx.lineTo(sx*r*.24,r*.42);ctx.fill()}
+  }
+  ctx.fillStyle='#ffffffcc';ctx.beginPath();ctx.ellipse(-r*.38,-r*.42,r*.18,r*.11,-.6,0,7);ctx.fill();
+  ctx.restore();
+}
+function cherry(ctx,px,py,r){
+  ctx.strokeStyle='#3ddc97';ctx.lineWidth=r*.18;ctx.beginPath();ctx.moveTo(px-r*.5,py);ctx.quadraticCurveTo(px,py-r*1.4,px+r*.3,py-r*1.3);ctx.moveTo(px+r*.5,py);ctx.lineTo(px+r*.3,py-r*1.3);ctx.stroke();
+  for(const sx of[-.5,.5]){ctx.fillStyle='#ff2d55';ctx.beginPath();ctx.arc(px+sx*r,py+r*.2,r*.5,0,7);ctx.fill();ctx.fillStyle='#fff8';ctx.beginPath();ctx.arc(px+sx*r-r*.15,py,r*.13,0,7);ctx.fill()}
+}
+function draw(){
+  const W=COLS*cell,H=ROWS*cell,ctx=bx;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  if(shake>0){ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake)}
+  ctx.fillStyle='#ffffff10';
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ctx.beginPath();ctx.arc((x+.5)*cell,(y+.5)*cell,1.5,0,7);ctx.fill()}
+  const r=cell*.46;
+  if(grid)for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const v=grid[y][x];if(!v)continue;
+    if(popping.has(x+','+y)){const t=Math.min(popT/260,1);bubble(ctx,(x+.5)*cell,(y+.5)*cell,r,v.c,v.m,1-t,1+t*.5)}
+    else bubble(ctx,(x+.5)*cell,(y+.5)*cell,r,v.c,v.m)}
+  if(cur&&state==='play'){
+    let gy=0;while(!hits(cur,0,gy+1))gy++;
+    ctx.strokeStyle='#ffffff40';ctx.lineWidth=2;
+    for(const c of cur.cells){const y=cur.y+c.y+gy;if(y>=0){ctx.beginPath();ctx.arc((cur.x+c.x+.5)*cell,(y+.5)*cell,r*.85,0,7);ctx.stroke()}}
+    for(const c of cur.cells){const y=cur.y+c.y;if(y>=0)bubble(ctx,(cur.x+c.x+.5)*cell,(y+.5)*cell,r,c.c,c.m)}
+  }
+  for(const p of parts){ctx.globalAlpha=Math.max(p.l,0);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x*cell,p.y*cell,cell*.12*p.l+1,0,7);ctx.fill()}
+  ctx.globalAlpha=1;ctx.textAlign='center';
+  for(const f of floats){const a=1-f.t/1.2,py=(f.y-f.t*1.5)*cell;ctx.globalAlpha=Math.max(a,0);
+    if(f.fruit)cherry(ctx,f.x*cell,py-cell*.6,cell*.35);
+    ctx.font=`${f.big?Math.round(cell*1.1):Math.round(cell*.55)}px Bungee, sans-serif`;
+    ctx.lineWidth=4;ctx.strokeStyle='#2a1557';ctx.strokeText(f.txt,f.x*cell,py+cell*.2);
+    ctx.fillStyle=f.big?'#ffd23f':'#fff';ctx.fillText(f.txt,f.x*cell,py+cell*.2)}
+  ctx.globalAlpha=1;
+}
+function drawNext(){
+  nx.clearRect(0,0,128,96);if(!nxt)return;
+  const xs=nxt.cells.map(c=>c.x),ys=nxt.cells.map(c=>c.y),s=22;
+  const w=(Math.max(...xs)-Math.min(...xs)+1)*s,h=(Math.max(...ys)-Math.min(...ys)+1)*s;
+  for(const c of nxt.cells)bubble(nx,64-w/2+(c.x-Math.min(...xs)+.5)*s,48-h/2+(c.y-Math.min(...ys)+.5)*s,s*.46,c.c,c.m);
+}
+function hud(){
+  $('sScore').textContent=score.toLocaleString('nb-NO');$('sLevel').textContent=level;$('sLines').textContent=lines;
+  $('sBest').textContent=Math.max(best,score).toLocaleString('nb-NO');
+}
+
+/* ---------- løkke ---------- */
+function loop(t){
+  const dt=Math.min(t-last,50);last=t;
+  if(state==='play'){dropT+=dt;const iv=Math.max(90,800-(level-1)*65);if(dropT>=iv){dropT=0;if(!hits(cur,0,1))cur.y++;else lock()}}
+  else if(state==='pop'){popT+=dt;if(popT>=260)finishPop()}
+  if(!state.startsWith('pause')){
+    for(const p of parts){p.x+=p.vx*dt/1000;p.y+=p.vy*dt/1000;p.vy+=14*dt/1000;p.l-=dt/600}
+    parts=parts.filter(p=>p.l>0);
+    for(const f of floats)f.t+=dt/1000;floats=floats.filter(f=>f.t<1.2);
+    shake=Math.max(0,shake-dt*.03);
+  }
+  draw();hud();requestAnimationFrame(loop);
+}
+
+/* ---------- størrelse ---------- */
+function fit(){
+  const w=well.clientWidth,h=well.clientHeight;
+  cell=Math.max(10,Math.floor(Math.min(w/COLS,h/ROWS)));dpr=window.devicePixelRatio||1;
+  board.style.width=cell*COLS+'px';board.style.height=cell*ROWS+'px';
+  board.width=cell*COLS*dpr;board.height=cell*ROWS*dpr;
+  ov.style.width=cell*COLS+'px';ov.style.height=cell*ROWS+'px';ov.style.inset='auto';ov.style.left=(w-cell*COLS)/2+'px';ov.style.top=(h-cell*ROWS)/2+'px';
+}
+const ro=new ResizeObserver(fit);ro.observe(well);
+
+/* ---------- kontroller ---------- */
+const acts={left:()=>move(-1),right:()=>move(1),rot:rotate,down:soft,drop:hard};
+const repeatable={left:1,right:1,down:1};
+document.querySelectorAll('.controls button').forEach(b=>{
+  let t1=null,t2=null;const a=b.dataset.a;
+  const stop=()=>{clearTimeout(t1);clearInterval(t2);b.classList.remove('on')};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();initAudio();b.classList.add('on');acts[a]();
+    if(repeatable[a])t1=setTimeout(()=>{t2=setInterval(acts[a],a==='down'?40:60)},170)});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,stop));
+});
+let sw=null;
+board.addEventListener('pointerdown',e=>{initAudio();sw={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,t:performance.now(),moved:false}});
+board.addEventListener('pointermove',e=>{if(!sw)return;
+  const dx=e.clientX-sw.x;if(Math.abs(dx)>=cell*.9){move(Math.sign(dx));sw.x=e.clientX;sw.moved=true}
+  const dy=e.clientY-sw.y;if(dy>=cell*1.2){soft();sw.y=e.clientY;sw.moved=true}});
+board.addEventListener('pointerup',e=>{if(!sw)return;
+  const dx=e.clientX-sw.sx,dy=e.clientY-sw.sy,dt=performance.now()-sw.t;
+  if(dy>70&&dy>Math.abs(dx)*1.5&&dt<250)hard();
+  else if(!sw.moved&&Math.abs(dx)<12&&Math.abs(dy)<12)rotate();
+  sw=null});
+board.addEventListener('pointercancel',()=>sw=null);
+document.addEventListener('keydown',e=>{
+  const k=e.key;
+  if(k==='ArrowLeft')move(-1);else if(k==='ArrowRight')move(1);else if(k==='ArrowDown')soft();
+  else if(k==='ArrowUp'||k==='x'||k==='X')rotate();else if(k===' '){if(state==='start'||state==='over')start();else hard()}
+  else if(k==='p'||k==='P'||k==='Escape')togglePause();else return;
+  e.preventDefault();
+});
+$('pauseBtn').onclick=togglePause;
+$('musicBtn').onclick=()=>{initAudio();musicOn=!musicOn;try{localStorage.setItem('bobleblokk-music',musicOn?'1':'0')}catch(e){}
+  musicIcon();if(musicOn&&(state==='play'||state==='pop'))musicStart();else musicStop()};
+musicIcon();
+$('startBtn').onclick=start;
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&(state==='play'||state==='pop'))togglePause()});
+
+fit();requestAnimationFrame(t=>{last=t;loop(t)});
+}
+</script>
+</body>
+</html>
